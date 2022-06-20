@@ -50,6 +50,9 @@ var AUTH = false
 //Because typing this over and over is silly
 type smap map[string]*secret
 
+//Cert hostname list
+var CERTHOSTNAMES string
+
 //Secrets are this
 type secret struct {
 	ID   string `json:"id"`
@@ -409,11 +412,20 @@ func main() {
 	//set up the map that stores secrets
 	secrets := smap{}
 
+	//check if cert hostnames are provided
+	CERTHOSTNAMES = os.Getenv("CERTHOSTNAMES")
+	var certHostnames []string
+	if CERTHOSTNAMES != "" {
+		certHostnames = strings.Split(CERTHOSTNAMES, ",")
+		// TODO: remove this
+		fmt.Println("cert hostnames:", certHostnames)
+	}
+
 	//set up cert manager for ssl certs
 	certManager := autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(""), //Your domain here
-		Cache:      autocert.DirCache("certs"), //Folder for storing certificates
+		HostPolicy: autocert.HostWhitelist(certHostnames...), //Your domain here
+		Cache:      autocert.DirCache("./certs"),             //Folder for storing certificates
 	}
 
 	//launch the janitor to remove secrets that haven't been retrieved
@@ -424,6 +436,8 @@ func main() {
 	var auth = flag.String("auth", "", "The auth filename.")
 	var token = flag.String("token", "", "The token link.")
 	var autocert = flag.Bool("autocert", false, "Whether to use Autocert or not.")
+	var tlsCert = flag.String("tls-cert", "server.crt", "The path to TLS cert file.")
+	var tlsKey = flag.String("tls-key", "server.key", "The path to TLS key file.")
 	flag.Parse()
 
 	// Check whether a token was specified. If not, it will get an empty string which is fine.
@@ -458,18 +472,28 @@ func main() {
 		}
 
 		go http.ListenAndServe(":http", certManager.HTTPHandler(nil))
-		err := server.ListenAndServeTLS("", "") //Key and cert are coming from Let's Encrypt
+		err := server.ListenAndServeTLS("", "") // Key and cert are coming from Let's Encrypt
 		if err != nil {
 			fmt.Printf("main(): %s\n", err)
 		}
 
 	} else {
 		fmt.Println("AutoCert: False.")
-		//Key and cert are coming from Let's Encrypt.
-		err := http.ListenAndServeTLS(":8443", "server.crt", "server.key", nil)
+		if _, err := os.Stat(*tlsCert); errors.Is(err, os.ErrNotExist) {
+			fmt.Printf("main(): %s\n", err)
+			fmt.Printf("Error reading TLS cert file: %s\n", *tlsCert)
+			os.Exit(1)
+		}
+
+		if _, err := os.Stat(*tlsKey); errors.Is(err, os.ErrNotExist) {
+			fmt.Printf("main(): %s\n", err)
+			fmt.Printf("Error reading TLS key file: %s\n", *tlsCert)
+			os.Exit(1)
+		}
+		// Key and cert are coming from Let's Encrypt.
+		err := http.ListenAndServeTLS(":8443", *tlsCert, *tlsKey, nil)
 		if err != nil {
 			fmt.Printf("main(): %s\n", err)
-			fmt.Printf("Errors usually mean you don't have the required server.crt or server.key files.\n")
 		}
 	}
 
@@ -477,7 +501,7 @@ func main() {
 
 //That's right friend, all the terrible HTML is right here in the source.
 const lackofstyle = `
-<html><head><title>FlashPaper</title></head>
+<html><head><title>ShareStuff</title></head>
 <style>
 * {  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; }
 body {
@@ -596,7 +620,7 @@ function finish() {
 
 <div class="container">
 	<div class="header">
-		<h1 style="color:dimgray"> <a style="text-decoration: none; color:dimgray;" href=/>Flashpape<span style="color:#4caf50">r</span> </a></h1>
+		<h1 style="color:dimgray"> <a style="text-decoration: none; color:dimgray;" href=/>ShareStuf<span style="color:#4caf50">f</span> </a></h1>
 	</div>
 	<div class="box boxSpec">
 		<h5 id="heading" style="color:gray;"> Here is your data: </h5>
@@ -636,7 +660,7 @@ const help = `
 
 <div class="container">
 	<div class="header">
-		<h1 style="color:dimgray"> <a style="text-decoration: none; color:dimgray;" href=/>Flashpape<span style="color:#4caf50">r</span> </a></h1>
+		<h1 style="color:dimgray"> ShareStuff is powered by <a style="text-decoration: none; color:dimgray;" href=/>Flashpape<span style="color:#4caf50">r</span> </a></h1>
 	</div>
 	<div class="box boxSpec">
 		<h2 style="color:gray;">A better way to share passwords.</h2>
@@ -689,7 +713,7 @@ const index = `
 
 <div class="container">
 	<div class="header">
-		<h1 style="color:dimgray"> <a style="text-decoration: none; color:dimgray;" href=/>Flashpape<span style="color:#4caf50">r</span> </a></h1>
+		<h1 style="color:dimgray"> <a style="text-decoration: none; color:dimgray;" href=/>ShareStuf<span style="color:#4caf50">f</span> </a></h1>
 	</div>
 	<div class="box boxSpec">
 		<a class="buttonLarge" href=/add>Share text</a>
@@ -748,7 +772,7 @@ const inputtextform = `
 
 <div class="container">
 	<div class="header">
-		<h1 style="color:dimgray"> <a style="text-decoration: none; color:dimgray;" href=/>Flashpape<span style="color:#4caf50">r</span> </a></h1>
+		<h1 style="color:dimgray"> <a style="text-decoration: none; color:dimgray;" href=/>ShareStuf<span style="color:#4caf50">f</span> </a></h1>
 	</div>
 	<div class="boxSpec box">
 		<form action="/add" method="POST">
@@ -807,7 +831,7 @@ input[type="submit"][disabled] {
 
 <div class="container">
 	<div class="header">
-		<h1 style="color:dimgray"> <a style="text-decoration: none; color:dimgray;" href=/>Flashpape<span style="color:#4caf50">r</span> </a></h1>
+		<h1 style="color:dimgray"> <a style="text-decoration: none; color:dimgray;" href=/>ShareStuf<span style="color:#4caf50">f</span> </a></h1>
 	</div>
 	<div class="box boxSpec">
 		<h5 style="color:#DD2727" id="fileSizeError"></h5>
