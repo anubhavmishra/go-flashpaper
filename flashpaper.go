@@ -86,9 +86,27 @@ func secretHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path[1:]
 	r.ParseForm()
 
+	fmt.Println(r.UserAgent())
+
 	//prevent slackbot from exploding links when posted to a channel
 	if strings.Contains(r.UserAgent(), "Slack") {
-		http.NotFound(w, r)
+		http.Error(w, "Not supported.", http.StatusNotAcceptable)
+		return
+	}
+
+	//disable link previewing when shared on iMessage
+	if strings.Contains(r.UserAgent(), "facebookexternalhit") {
+		http.Error(w, "Not supported.", http.StatusNotAcceptable)
+		return
+	}
+
+	if strings.Contains(r.UserAgent(), "Facebot") {
+		http.Error(w, "Not supported.", http.StatusNotAcceptable)
+		return
+	}
+
+	if strings.Contains(r.UserAgent(), "Twitterbot") {
+		http.Error(w, "Not supported.", http.StatusNotAcceptable)
 		return
 	}
 
@@ -433,12 +451,16 @@ func main() {
 
 	// Setup the flags.
 	// value = default when not specified.
+	var listenAddress = flag.String("listen-address", "127.0.0.1:8443", "Server listen address.")
 	var auth = flag.String("auth", "", "The auth filename.")
 	var token = flag.String("token", "", "The token link.")
 	var autocert = flag.Bool("autocert", false, "Whether to use Autocert or not.")
 	var tlsCert = flag.String("tls-cert", "server.crt", "The path to TLS cert file.")
 	var tlsKey = flag.String("tls-key", "server.key", "The path to TLS key file.")
 	flag.Parse()
+
+	// Print server listen address
+	fmt.Printf("Server listen address: %s.\n", *listenAddress)
 
 	// Check whether a token was specified. If not, it will get an empty string which is fine.
 	CANARYTOKEN = *token
@@ -465,7 +487,7 @@ func main() {
 	if *autocert {
 		fmt.Println("AutoCert: True.")
 		server := &http.Server{
-			Addr: ":8443",
+			Addr: *listenAddress,
 			TLSConfig: &tls.Config{
 				GetCertificate: certManager.GetCertificate,
 			},
@@ -491,7 +513,7 @@ func main() {
 			os.Exit(1)
 		}
 		// Key and cert are coming from Let's Encrypt.
-		err := http.ListenAndServeTLS(":8443", *tlsCert, *tlsKey, nil)
+		err := http.ListenAndServeTLS(*listenAddress, *tlsCert, *tlsKey, nil)
 		if err != nil {
 			fmt.Printf("main(): %s\n", err)
 		}
